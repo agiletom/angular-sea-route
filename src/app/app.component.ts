@@ -1,6 +1,11 @@
 import { Component } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import * as Leaflet from 'leaflet';
-import "leaflet-control-geocoder";
+import 'leaflet-ant-path';
+import * as XLSX from 'xlsx';
+import 'leaflet-control-geocoder';
+
+const { AntPath } = require('leaflet-ant-path');
 
 Leaflet.Icon.Default.imagePath = 'assets/';
 @Component({
@@ -13,36 +18,31 @@ export class AppComponent {
   markers: Leaflet.Marker[] = [];
   options = {
     layers: [
-      Leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        Leaflet.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       })
     ],
     zoom: 16,
     center: { lat: 28.626137, lng: 79.821603 }
+  };
+  data = [];
+
+  constructor(private http: HttpClient) { }
+
+  getDatafromCsv() {
+    const url = 'assets/web_challenge.csv'; // Path to your file in the assets folder
+    this.http.get(url, { responseType: 'arraybuffer' })
+      .subscribe(data => {
+        const csvCont = XLSX.read(data, { type: 'buffer' });
+        const sheetNames = csvCont.SheetNames;
+
+        if (sheetNames.length) {
+          this.data = XLSX.utils.sheet_to_json(csvCont.Sheets[sheetNames[0]]);
+        }
+      });
   }
 
   initMarkers() {
-    const initialMarkers = [
-      {
-        position: { lat: 28.625485, lng: 79.821091 },
-        draggable: true
-      },
-      {
-        position: { lat: 28.625293, lng: 79.817926 },
-        draggable: false
-      },
-      {
-        position: { lat: 28.625182, lng: 79.81464 },
-        draggable: true
-      }
-    ];
-    for (let index = 0; index < initialMarkers.length; index++) {
-      const data = initialMarkers[index];
-      const marker = this.generateMarker(data, index);
-      marker.addTo(this.map).bindPopup(`<b>${data.position.lat},  ${data.position.lng}</b>`);
-      this.map.panTo(data.position);
-      this.markers.push(marker)
-    }
+    
   }
 
   generateMarker(data: any, index: number) {
@@ -53,6 +53,7 @@ export class AppComponent {
 
   onMapReady($event: Leaflet.Map) {
     this.map = $event;
+    this.getDatafromCsv();
     this.initMarkers();
   }
 
@@ -73,7 +74,7 @@ export class AppComponent {
     return new Promise((resolve, reject) => {
         geocoder.reverse(
             { lat, lng },
-            this.options.zoom,
+            this.map.getZoom(),
             (results: any) => results.length ? resolve(results[0].name) : reject(null)
         );
     })
